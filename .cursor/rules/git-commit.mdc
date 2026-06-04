@@ -1,0 +1,17 @@
+---
+description: Always commit email-inbox changes when finishing work in this repo
+alwaysApply: true
+---
+
+# Git commits (email-inbox)
+
+When you change files in this repository (`~/Projects/email-inbox`):
+
+1. **Commit before ending the task** — Do not leave implementation work uncommitted unless the user explicitly says not to commit.
+2. **Run tests first** — `uv run pytest` (or the relevant subset). Fix failures before committing.
+3. **One logical commit per task** — Message should state the why in 1–2 sentences; match recent style (`git log -3`).
+4. **Do not push** unless the user asks.
+5. **Do not commit** secrets (`.env`, credentials), `.venv/`, or `.pytest_cache/`.
+6. **Scope** — Only stage files for this repo; do not bundle unrelated vault edits in the same commit.
+
+Use a HEREDOC for the commit message. After commit, `git status` should be clean for files you changed.

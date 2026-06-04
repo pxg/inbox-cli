@@ -1,0 +1,4 @@
+# Optional: enable with direnv (brew install direnv; add hook to ~/.zshrc)
+# cp .envrc.example .envrc && direnv allow
+
+export EMAIL_INBOX_VAULT_ROOT="$HOME/Documents/Obsidian Vault"

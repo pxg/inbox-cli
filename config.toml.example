@@ -1,0 +1,19 @@
+# Copy to ~/.config/inbox-cli/config.toml
+# Precedence: --vault-root > INBOX_VAULT_ROOT > this file > ~/Documents/Obsidian Vault
+# Editor: --no-open / --open > INBOX_EDITOR > editor here > obsidian
+
+vault_root = "~/Documents/Obsidian Vault"
+
+# Default: open replies in Obsidian after pick
+editor = "obsidian"
+
+# Other built-in names: none, cursor, code, vscode
+# editor = "cursor"
+
+# Custom launcher ({path} = reply file)
+# editor = ["cursor", "{path}"]
+
+# Legacy (still supported): open_obsidian = false
+
+# TUI: poll Gmail every N seconds in browse mode (default 60). Set 0 to disable.
+# auto_refresh_seconds = 60
