@@ -12,6 +12,7 @@ from email_inbox.formatting import InboxRow
 from email_inbox.gog import (
     GogError,
     authorized_gmail_accounts,
+    enrich_multi_message_rows,
     gmail_search_unread,
     inbox_row_message_fields_from_search,
 )
@@ -98,7 +99,7 @@ def _fetch_one(mb: Mailbox, *, max_n: int, newer_than: str | None) -> list[Inbox
                 snippet=snippet,
             )
         )
-    return rows
+    return enrich_multi_message_rows(mb.address, rows)
 
 
 def list_result_to_json(result: ListResult, *, query: str) -> str:

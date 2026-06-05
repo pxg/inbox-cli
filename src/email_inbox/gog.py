@@ -6,7 +6,8 @@ import base64
 import json
 import re
 import subprocess
-from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -131,9 +132,41 @@ def inbox_row_message_fields_from_search(thread: dict[str, Any]) -> tuple[int, s
     return message_count, latest_message_id, snippet
 
 
+def enrich_multi_message_rows(mailbox: str, rows: list[InboxRow]) -> list[InboxRow]:
+    """
+    gog search reports From from the first message in a thread; fix multi-message rows.
+
+    Single-message threads are unchanged. Each multi-message row costs one thread get.
+    """
+    if not rows:
+        return rows
+    indices = [index for index, row in enumerate(rows) if row.message_count > 1]
+    if not indices:
+        return rows
+
+    updated = list(rows)
+
+    def enrich_index(index: int) -> tuple[int, InboxRow]:
+        row = rows[index]
+        thread_json = gmail_thread_get(mailbox, row.thread_id)
+        message = parse_latest_unread_message(thread_json)
+        return index, replace(
+            row,
+            from_header=message.from_header or row.from_header,
+            latest_message_id=message.message_id or row.latest_message_id,
+            snippet=message.snippet or row.snippet,
+        )
+
+    workers = min(10, len(indices))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for index, row in pool.map(enrich_index, indices):
+            updated[index] = row
+    return updated
+
+
 def thread_message_from_inbox_row(row: InboxRow) -> ThreadMessage | None:
     """Build ThreadMessage from list-time cache, or None if thread get is required."""
-    if row.message_count > 1 or not row.latest_message_id:
+    if not row.latest_message_id:
         return None
     return ThreadMessage(
         message_id=row.latest_message_id,
@@ -151,7 +184,7 @@ def latest_message_for_inbox_row(row: InboxRow) -> ThreadMessage:
     if cached is not None:
         return cached
     thread_json = gmail_thread_get(row.mailbox, row.thread_id)
-    return parse_latest_message(thread_json)
+    return parse_latest_unread_message(thread_json)
 
 
 def latest_message_for_reply(row: InboxRow) -> ThreadMessage:
@@ -165,16 +198,36 @@ def parse_latest_message(thread_json: dict[str, Any]) -> ThreadMessage:
     messages = thread.get("messages") or []
     if not messages:
         raise ValueError("thread has no messages")
-    latest = messages[-1]
-    headers = _message_headers(latest)
+    return _message_to_thread_message(messages[-1])
+
+
+def parse_latest_unread_message(thread_json: dict[str, Any]) -> ThreadMessage:
+    """Prefer the newest unread message; fall back to the chronologically latest."""
+    thread = thread_json.get("thread") or {}
+    messages = thread.get("messages") or []
+    if not messages:
+        raise ValueError("thread has no messages")
+    for message in reversed(messages):
+        if _message_is_unread(message):
+            return _message_to_thread_message(message)
+    return _message_to_thread_message(messages[-1])
+
+
+def _message_is_unread(message: dict[str, Any]) -> bool:
+    labels = message.get("labelIds") or message.get("label_ids") or []
+    return any(str(label).upper() == "UNREAD" for label in labels)
+
+
+def _message_to_thread_message(message: dict[str, Any]) -> ThreadMessage:
+    headers = _message_headers(message)
     return ThreadMessage(
-        message_id=str(latest.get("id") or ""),
+        message_id=str(message.get("id") or ""),
         from_header=headers.get("from", ""),
         to_header=headers.get("to", ""),
         subject=headers.get("subject", ""),
-        snippet=_decode_snippet(str(latest.get("snippet") or "")),
+        snippet=_decode_snippet(str(message.get("snippet") or "")),
         date_header=headers.get("date", ""),
-        body=_message_body(latest),
+        body=_message_body(message),
     )
 
 

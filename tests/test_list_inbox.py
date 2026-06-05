@@ -15,10 +15,29 @@ def _config() -> AccountsConfig:
     )
 
 
+@patch("email_inbox.gog.gmail_thread_get")
 @patch("email_inbox.list_inbox.gmail_search_unread")
 @patch("email_inbox.list_inbox.authorized_gmail_accounts")
-def test_parallel_merge_and_sort(auth_mock, search_mock) -> None:
+def test_parallel_merge_and_sort(auth_mock, search_mock, thread_get_mock) -> None:
     auth_mock.return_value = {"a@gmail.com", "b@co.uk"}
+    thread_get_mock.return_value = {
+        "thread": {
+            "messages": [
+                {
+                    "id": "m1",
+                    "payload": {"headers": [{"name": "From", "value": "Bob <b@y.com>"}]},
+                },
+                {
+                    "id": "m2",
+                    "labelIds": ["UNREAD", "INBOX"],
+                    "snippet": "Follow up",
+                    "payload": {
+                        "headers": [{"name": "From", "value": "Carol <carol@y.com>"}],
+                    },
+                },
+            ]
+        }
+    }
 
     def search_side_effect(mailbox: str, **kwargs):
         if mailbox == "a@gmail.com":
@@ -46,7 +65,9 @@ def test_parallel_merge_and_sort(auth_mock, search_mock) -> None:
     assert len(result.rows) == 2
     assert result.rows[0].subject == "Newer"
     assert result.rows[0].message_count == 2
-    assert result.rows[0].latest_message_id == ""
+    assert result.rows[0].from_header == "Carol <carol@y.com>"
+    assert result.rows[0].latest_message_id == "m2"
+    thread_get_mock.assert_called_once_with("b@co.uk", "t2")
     assert result.rows[1].subject == "Older"
     assert result.rows[1].latest_message_id == "t1"
 

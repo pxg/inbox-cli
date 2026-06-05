@@ -29,7 +29,7 @@ class InboxRow:
     @property
     def has_cached_latest_message(self) -> bool:
         """True when list/search already has enough data to skip gog thread get."""
-        return self.message_count <= 1 and bool(self.latest_message_id)
+        return bool(self.latest_message_id)
 
     @property
     def from_display(self) -> str:
