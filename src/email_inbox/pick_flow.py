@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from email_inbox.obsidian import open_in_obsidian
+from email_inbox.editor import EditorConfig, open_reply_file
 from email_inbox.formatting import InboxRow
 from email_inbox.pick import AmbiguousProjectError, format_success, pick_and_write, pick_inbox_row
 from email_inbox.routing import format_project_menu, project_from_input
@@ -15,7 +15,7 @@ def pick_inbox_row_flow(
     vault_root: Path,
     row: InboxRow,
     *,
-    open_obsidian: bool,
+    editor: EditorConfig,
     project: str | None = None,
 ) -> Path | None:
     """Pick by inbox row identity (for TUI after rows removed from table)."""
@@ -28,8 +28,8 @@ def pick_inbox_row_flow(
         raise
 
     notify(format_success(vault_root, path))
-    if open_obsidian and open_in_obsidian(path):
-        notify("Opened in Obsidian")
+    if open_reply_file(path, editor):
+        notify(editor.success_message())
     return path
 
 
@@ -37,7 +37,7 @@ def pick_row(
     vault_root: Path,
     row_number: int,
     *,
-    open_obsidian: bool,
+    editor: EditorConfig,
     project: str | None = None,
 ) -> Path | None:
     """
@@ -54,8 +54,8 @@ def pick_row(
         raise
 
     notify(format_success(vault_root, path))
-    if open_obsidian and open_in_obsidian(path):
-        notify("Opened in Obsidian")
+    if open_reply_file(path, editor):
+        notify(editor.success_message())
     return path
 
 
@@ -63,7 +63,7 @@ def pick_row_prompt(
     vault_root: Path,
     row_number: int,
     *,
-    open_obsidian: bool,
+    editor: EditorConfig,
 ) -> Path | None:
     """Pick with stdin retry loop for ambiguous project."""
     project: str | None = None
@@ -95,8 +95,8 @@ def pick_row_prompt(
             break
 
     notify(format_success(vault_root, path))
-    if open_obsidian and open_in_obsidian(path):
-        notify("Opened in Obsidian")
+    if open_reply_file(path, editor):
+        notify(editor.success_message())
     return path
 
 

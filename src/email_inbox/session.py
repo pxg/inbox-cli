@@ -59,7 +59,7 @@ def write_session(path: Path, payload: dict) -> None:
 
 def load_session(path: Path) -> dict:
     if not path.is_file():
-        raise FileNotFoundError(f"session not found: {path} (run `email-inbox list` first)")
+        raise FileNotFoundError(f"session not found: {path} (run `inbox list` first)")
     return json.loads(path.read_text(encoding="utf-8"))
 
 

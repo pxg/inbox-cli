@@ -6,7 +6,8 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from email_inbox.config import load_config
+from email_inbox.config import load_config, resolve_auto_refresh_seconds
+from email_inbox.editor import EditorConfig
 from email_inbox.formatting import InboxRow, render_inbox
 from email_inbox.pick_flow import pick_row_prompt
 from email_inbox.send import AlreadySentError, is_reply_sent, push_draft, push_send
@@ -19,8 +20,11 @@ def should_interact(
     no_interactive: bool,
     is_json: bool,
     row_count: int,
+    use_tui: bool = False,
 ) -> bool:
-    if is_json or row_count == 0:
+    if is_json:
+        return False
+    if row_count == 0 and not use_tui:
         return False
     if no_interactive:
         return False
@@ -33,21 +37,27 @@ def run_pick_loop(
     vault_root: Path,
     rows: list[InboxRow],
     *,
-    open_obsidian: bool | None = None,
+    editor: EditorConfig | None = None,
     refresh_rows: Callable[[], list[InboxRow]] | None = None,
     output_format: str = "auto",
-    use_tui: bool = False,
+    use_tui: bool | None = None,
+    auto_refresh_seconds: int | None = None,
 ) -> int:
-    """Pick a row (typed prompt or Textual table), then draft/send/next prompts."""
-    if open_obsidian is None:
-        open_obsidian = load_config().open_obsidian
+    """Pick a row via Textual (default on TTY) or typed prompts with --no-tui."""
+    if editor is None:
+        editor = load_config().editor
+    if use_tui is None:
+        use_tui = sys.stdin.isatty()
+    if auto_refresh_seconds is None:
+        auto_refresh_seconds = resolve_auto_refresh_seconds()
 
     if use_tui and sys.stdin.isatty():
         return run_textual_inbox_session(
             vault_root,
             rows,
-            open_obsidian=open_obsidian,
+            editor=editor,
             refresh_rows=refresh_rows,
+            auto_refresh_seconds=auto_refresh_seconds,
         )
 
     current_rows = list(rows)
@@ -57,7 +67,7 @@ def run_pick_loop(
         if row_number is None:
             return 0
 
-        path = pick_row_prompt(vault_root, row_number, open_obsidian=open_obsidian)
+        path = pick_row_prompt(vault_root, row_number, editor=editor)
         if path is None:
             continue
 
@@ -151,7 +161,7 @@ def _after_pick_menu(
         new_path = pick_row_prompt(
             vault_root,
             row_number,
-            open_obsidian=load_config().open_obsidian,
+            editor=load_config().editor,
         )
         if new_path is None:
             continue

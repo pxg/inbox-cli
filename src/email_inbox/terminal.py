@@ -12,10 +12,11 @@ from rich.text import Text
 
 from email_inbox.formatting import InboxRow
 
-# Match terminal inbox reference: grid box, plain headers, lavender link subjects.
-_SUBJECT_COLOR = "#9eb3ff"
-_CELL_STYLE = "white"
-_HEADER_STYLE = "white"
+from email_inbox.theme import HEADER, SUBJECT, SUBJECT_UNDERLINE, TEXT_BRIGHT
+
+_SUBJECT_COLOR = SUBJECT_UNDERLINE
+_CELL_STYLE = TEXT_BRIGHT
+_HEADER_STYLE = f"bold {HEADER}"
 
 
 def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:

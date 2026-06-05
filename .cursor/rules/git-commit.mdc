@@ -1,11 +1,11 @@
 ---
-description: Always commit email-inbox changes when finishing work in this repo
+description: Always commit inbox-cli changes when finishing work in this repo
 alwaysApply: true
 ---
 
-# Git commits (email-inbox)
+# Git commits (inbox-cli)
 
-When you change files in this repository (`~/Projects/email-inbox`):
+When you change files in this repository (`~/Projects/inbox-cli`):
 
 1. **Commit before ending the task** — Do not leave implementation work uncommitted unless the user explicitly says not to commit.
 2. **Run tests first** — `uv run pytest` (or the relevant subset). Fix failures before committing.

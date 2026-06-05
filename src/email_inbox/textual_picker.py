@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -13,18 +14,34 @@ from textual.containers import Container
 from textual.screen import ModalScreen
 from textual.widgets import DataTable as DataTableWidget
 from textual.widgets import Label, ListItem, ListView, Static
+from rich.text import Text
 
 from email_inbox.browser import open_url
 from email_inbox.formatting import InboxRow
 from email_inbox.mark_read import mark_read_inbox_row
 from email_inbox.paths import session_path
 from email_inbox.pick import AmbiguousProjectError
-from email_inbox.obsidian import open_in_obsidian
+from email_inbox.editor import EditorConfig, open_reply_file
 from email_inbox.pick_flow import pick_inbox_row_flow
 from email_inbox.session import build_session, load_session, write_session
 from email_inbox.routing import list_project_options, project_from_input
 from email_inbox.send import AlreadySentError, is_reply_sent, push_draft, push_send
-from email_inbox.terminal import _subject_text
+from email_inbox.config import DEFAULT_AUTO_REFRESH_SECONDS
+from email_inbox.theme import (
+    BG,
+    BORDER,
+    CURSOR_BG,
+    CURSOR_FG,
+    HEADER,
+    HINT_KEY,
+    HINT_LABEL,
+    MODAL_BORDER,
+    SUBJECT,
+    TEXT,
+    TEXT_BRIGHT,
+    hint_commands_text,
+    title_bar,
+)
 
 
 class InboxDataTable(DataTableWidget):
@@ -34,9 +51,15 @@ class InboxDataTable(DataTableWidget):
         *DataTableWidget.BINDINGS,
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
-        Binding("r", "mark_read_focused", "Mark read", priority=True),
-        Binding("o", "open_gmail_focused", "Gmail", priority=True),
+        Binding("x", "mark_read_focused", "Mark read", priority=True),
+        Binding("r", "refresh_focused", "Refresh", priority=True),
+        Binding("o", "open_gmail_focused", "Open", priority=True),
     ]
+
+    def action_refresh_focused(self) -> None:
+        app = self.app
+        if isinstance(app, InboxTuiApp):
+            app.action_refresh_inbox()
 
     def action_open_gmail_focused(self) -> None:
         app = self.app
@@ -55,22 +78,34 @@ class InboxDataTable(DataTableWidget):
 class ProjectPickerScreen(ModalScreen[str | None]):
     """Choose project when routing is ambiguous."""
 
-    CSS = """
-    ProjectPickerScreen {
+    CSS = f"""
+    ProjectPickerScreen {{
         align: center middle;
-    }
-    #picker_dialog {
+        background: {BG};
+    }}
+    #picker_dialog {{
         width: 64;
         height: auto;
         max-height: 22;
-        border: solid $primary;
-        background: $surface;
+        border: solid {MODAL_BORDER};
+        background: {BG};
+        color: {TEXT_BRIGHT};
         padding: 1 2;
-    }
-    #project_list {
+    }}
+    #picker_dialog > Label {{
+        color: {HEADER};
+        text-style: bold;
+    }}
+    #project_list {{
         height: auto;
         max-height: 14;
-    }
+        background: {BG};
+        color: {TEXT_BRIGHT};
+    }}
+    ListView > ListItem.highlight {{
+        background: {CURSOR_BG};
+        color: {CURSOR_FG};
+    }}
     """
 
     def __init__(self, vault_root: Path, candidates: list[str]) -> None:
@@ -121,45 +156,104 @@ class ProjectPickerScreen(ModalScreen[str | None]):
         self.dismiss(None)
 
 
+class InboxZeroScreen(ModalScreen[None]):
+    """Celebration when the last unread row leaves the table."""
+
+    CSS = f"""
+    InboxZeroScreen {{
+        align: center middle;
+        background: {BG};
+    }}
+    #zero_dialog {{
+        width: 52;
+        height: auto;
+        border: solid {MODAL_BORDER};
+        background: {BG};
+        padding: 1 3;
+    }}
+    #zero_title {{
+        width: 100%;
+        text-align: center;
+        color: {HEADER};
+        text-style: bold;
+        padding: 0 0 1 0;
+    }}
+    #zero_subtitle {{
+        width: 100%;
+        text-align: center;
+        color: {SUBJECT};
+        padding: 0 0 1 0;
+    }}
+    #zero_hint {{
+        width: 100%;
+        text-align: center;
+        color: {HINT_LABEL};
+    }}
+    """
+
+    def compose(self) -> ComposeResult:
+        with Container(id="zero_dialog"):
+            yield Label("✦  INBOX ZERO  ✦", id="zero_title")
+            yield Label("You're all caught up.", id="zero_subtitle")
+            yield Label("enter · esc · q — continue", id="zero_hint")
+
+    def key_enter(self) -> None:
+        self.dismiss(None)
+
+    def key_escape(self) -> None:
+        self.dismiss(None)
+
+    def key_q(self) -> None:
+        self.dismiss(None)
+
+
 class InboxTuiApp(App[int]):
     """
-    Browse: enter open Obsidian, o Gmail in browser, r mark read, f refresh, q quit.
-    Action (after open): d draft, s send, o Gmail, esc browse, q quit.
+    Browse: enter reply, o open, r refresh, x mark read, q quit.
+    Action (after open): d draft, s send, o open, esc browse, q quit.
     """
 
     SHOW_FOOTER = False
 
-    CSS = """
-    Screen {
-        background: #000000;
-    }
-    InboxDataTable {
+    CSS = f"""
+    Screen {{
+        background: {BG};
+    }}
+    InboxDataTable {{
         height: 1fr;
-        background: #000000;
-        color: #ffffff;
-    }
-    InboxDataTable > .datatable--cursor {
-        background: #444444;
-        color: #ffffff;
-    }
-    InboxDataTable > .datatable--header {
-        background: #000000;
-        color: #ffffff;
+        background: {BG};
+        color: {TEXT_BRIGHT};
+        border: solid {BORDER};
+    }}
+    InboxDataTable > .datatable--cursor {{
+        background: {CURSOR_BG};
+        color: {CURSOR_FG};
         text-style: bold;
-    }
-    #hint_bar {
+    }}
+    InboxDataTable > .datatable--header {{
+        background: {BG};
+        color: {HEADER};
+        text-style: bold;
+    }}
+    InboxDataTable > .datatable--odd-row {{
+        background: {BG};
+    }}
+    InboxDataTable > .datatable--even-row {{
+        background: #140f24;
+    }}
+    #hint_bar {{
         height: 1;
         padding: 0 1;
-        color: #9eb3ff;
-        background: #1a1a1a;
-    }
+        color: {TEXT};
+        background: {BG};
+    }}
     """
 
     BINDINGS = [
         Binding("q", "quit_app", "Quit", priority=True),
-        Binding("f", "refresh_inbox", "Refresh"),
-        Binding("r", "mark_read_row", "Mark read", priority=True),
-        Binding("o", "open_gmail", "Gmail", priority=True),
+        Binding("r", "refresh_inbox", "Refresh"),
+        Binding("x", "mark_read_row", "Mark read", priority=True),
+        Binding("o", "open_gmail", "Open", priority=True),
         Binding("enter", "open_row", "Open", show=False),
         Binding("d", "push_draft", "Draft"),
         Binding("s", "push_send", "Send"),
@@ -171,17 +265,25 @@ class InboxTuiApp(App[int]):
         vault_root: Path,
         rows: list[InboxRow],
         *,
-        open_obsidian: bool,
+        editor: EditorConfig,
         refresh_rows: Callable[[], list[InboxRow]] | None = None,
+        auto_refresh_seconds: int = DEFAULT_AUTO_REFRESH_SECONDS,
     ) -> None:
         super().__init__()
         self.vault_root = vault_root
         self.rows = list(rows)
-        self.open_obsidian = open_obsidian
+        self.editor = editor
         self.refresh_rows = refresh_rows
+        self.auto_refresh_seconds = (
+            auto_refresh_seconds if refresh_rows is not None else 0
+        )
         self.reply_path: Path | None = None
         self.open_row_index: int | None = None
+        self.action_row: InboxRow | None = None
         self._busy_message: str | None = None
+        self._inbox_zero_celebration_active = False
+        self._auto_refresh_pause_until = 0.0
+        self._recently_dismissed: dict[tuple[str, str], float] = {}
         self.mode = "browse"
 
     def compose(self) -> ComposeResult:
@@ -189,10 +291,17 @@ class InboxTuiApp(App[int]):
         yield Static("", id="hint_bar")
 
     def on_mount(self) -> None:
-        self.title = f"Inbox ({len(self.rows)} unread)"
+        self._hint_bar = self.query_one("#hint_bar", Static)
+        self.title = title_bar(len(self.rows))
         self._fill_table()
         self._update_ui()
         self.query_one("#inbox_table", InboxDataTable).focus()
+        if self.auto_refresh_seconds > 0:
+            self.set_interval(
+                self.auto_refresh_seconds,
+                self._auto_refresh_tick,
+                name="inbox_auto_refresh",
+            )
 
     def _fill_table(self) -> None:
         table = self.query_one("#inbox_table", InboxDataTable)
@@ -202,7 +311,7 @@ class InboxTuiApp(App[int]):
             table.add_row(
                 str(index),
                 row.from_display,
-                _subject_text(row),
+                row.subject_for_table,
                 row.label,
                 row.date,
             )
@@ -220,15 +329,67 @@ class InboxTuiApp(App[int]):
 
     def _apply_table_ui(self, *, focus_table: bool = True) -> None:
         """Redraw table from self.rows (fast; safe to call before gog finishes)."""
-        self.title = f"Inbox ({len(self.rows)} unread)"
+        self.title = title_bar(len(self.rows))
         self.mode = "browse"
         self.reply_path = None
         self.open_row_index = None
+        self.action_row = None
         self._fill_table()
         self._update_ui()
         self.refresh()
         if focus_table and self.rows:
             self.query_one("#inbox_table", InboxDataTable).focus()
+
+    def _pause_auto_refresh(self, seconds: float = 10) -> None:
+        self._auto_refresh_pause_until = time.monotonic() + seconds
+
+    def _note_dismissed(self, row: InboxRow) -> None:
+        key = (row.mailbox, row.thread_id)
+        suppress = self.auto_refresh_seconds or DEFAULT_AUTO_REFRESH_SECONDS
+        self._recently_dismissed[key] = time.monotonic() + suppress
+
+    def _filter_recently_dismissed(self, rows: list[InboxRow]) -> list[InboxRow]:
+        now = time.monotonic()
+        self._recently_dismissed = {
+            key: expiry
+            for key, expiry in self._recently_dismissed.items()
+            if expiry > now
+        }
+        return [
+            row
+            for row in rows
+            if (row.mailbox, row.thread_id) not in self._recently_dismissed
+        ]
+
+    def _apply_auto_refresh_rows(self, rows: list[InboxRow]) -> None:
+        """Merge fetch into browse table without leaving action mode."""
+        if self.mode != "browse" or self._busy_message:
+            return
+        table = self.query_one("#inbox_table", InboxDataTable)
+        cursor = table.cursor_row
+        self.rows = rows
+        self.title = title_bar(len(self.rows))
+        try:
+            self._sync_session_from_rows()
+        except OSError:
+            pass
+        self._fill_table()
+        if cursor is not None and self.rows:
+            table.move_cursor(row=min(cursor, len(self.rows) - 1))
+        self._update_ui()
+
+    def _auto_refresh_tick(self) -> None:
+        if not self.refresh_rows or self.auto_refresh_seconds <= 0:
+            return
+        if (
+            self._busy_message
+            or self.mode != "browse"
+            or self._inbox_zero_celebration_active
+        ):
+            return
+        if time.monotonic() < self._auto_refresh_pause_until:
+            return
+        self.run_worker(self._do_auto_refresh(), exclusive=True, group="inbox_refresh")
 
     def _cursor_row_index(self) -> int | None:
         if not self.rows:
@@ -259,24 +420,55 @@ class InboxTuiApp(App[int]):
     def _update_ui(self) -> None:
         self._update_hint_bar()
 
-    def _hint_text(self) -> str:
+    def _hint_content(self) -> Text:
         if self._busy_message:
-            return f"⏳ {self._busy_message}"
+            msg = self._busy_message.rstrip("…").upper()
+            return Text(f"  * {msg} *", style=HEADER)
         if not self.rows:
-            refresh = " · f refresh" if self.refresh_rows else ""
-            return f"Inbox empty{refresh} · q quit"
+            cmds: list[tuple[str, str]] = []
+            if self.refresh_rows:
+                cmds.append(("r", "refresh"))
+            cmds.append(("q", "quit"))
+            prefix = Text("  INBOX ZERO — ", style=HEADER)
+            prefix.append_text(hint_commands_text(*cmds))
+            return prefix
         if self.mode == "action" and self.reply_path is not None:
             label = self.reply_path.name
             if is_reply_sent(self.reply_path):
-                actions = "o gmail · esc back · q quit"
+                actions = hint_commands_text(
+                    ("o", "open"), ("esc", "back"), ("q", "quit")
+                )
             else:
-                actions = "d draft · s send · o gmail · esc back · q quit"
-            return f"↩ {label} · {actions}"
-        refresh = " · f refresh" if self.refresh_rows else ""
-        return f"enter open · o gmail · r read{refresh} · q quit"
+                actions = hint_commands_text(
+                    ("d", "draft"),
+                    ("s", "send"),
+                    ("o", "open"),
+                    ("esc", "back"),
+                    ("q", "quit"),
+                )
+            prefix = Text(f"  {label} — ", style=HEADER)
+            prefix.append_text(actions)
+            return prefix
+        cmds = [
+            ("enter", "reply"),
+            ("o", "open"),
+            ("x", "read"),
+        ]
+        if self.refresh_rows:
+            cmds.append(("r", "refresh"))
+        cmds.append(("q", "quit"))
+        line = Text("  ")
+        line.append_text(hint_commands_text(*cmds))
+        return line
 
     def _update_hint_bar(self) -> None:
-        self.query_one("#hint_bar", Static).update(f"  {self._hint_text()}")
+        hint = getattr(self, "_hint_bar", None)
+        if hint is None:
+            try:
+                hint = self.query_one("#hint_bar", Static)
+            except Exception:
+                return
+        hint.update(self._hint_content())
 
     def _set_busy(self, message: str) -> None:
         self._busy_message = message
@@ -287,20 +479,74 @@ class InboxTuiApp(App[int]):
         self._update_ui()
 
     def _focused_inbox_row(self) -> InboxRow | None:
-        if self.mode == "action" and self.open_row_index is not None:
-            idx = self.open_row_index
-            if 0 <= idx < len(self.rows):
-                return self.rows[idx]
+        if self.mode == "action" and self.action_row is not None:
+            return self.action_row
         return self._current_row()
+
+    def _drop_row_from_table(
+        self, row_index: int, *, celebrate_on_empty: bool = True
+    ) -> InboxRow:
+        row = self.rows[row_index]
+        del self.rows[row_index]
+        try:
+            self._sync_session_from_rows()
+        except OSError as exc:
+            self.notify(f"Session save failed: {exc}", severity="warning")
+        self.title = title_bar(len(self.rows))
+        self._redraw_table()
+        self._note_dismissed(row)
+        self._pause_auto_refresh()
+        if not self.rows and celebrate_on_empty:
+            self._schedule_inbox_zero_celebration()
+        return row
+
+    def _schedule_inbox_zero_celebration(self) -> None:
+        if self._inbox_zero_celebration_active:
+            return
+        self.run_worker(self._run_inbox_zero_celebration(), exclusive=False, group="inbox_zero")
+
+    async def _run_inbox_zero_celebration(self) -> None:
+        self._inbox_zero_celebration_active = True
+        try:
+            await self.push_screen_wait(InboxZeroScreen())
+        finally:
+            self._inbox_zero_celebration_active = False
+
+    def _restore_row_at(self, row_index: int, row: InboxRow) -> None:
+        self.rows.insert(min(row_index, len(self.rows)), row)
+        try:
+            self._sync_session_from_rows()
+        except OSError:
+            pass
+        self.title = title_bar(len(self.rows))
+        self._redraw_table()
+
+    def _redraw_table(self) -> None:
+        self._fill_table()
+        self.query_one("#inbox_table", InboxDataTable).refresh()
 
     def action_open_gmail(self) -> None:
         if self._busy_message:
             return
-        row = self._focused_inbox_row()
-        if row is None:
+        if self.mode == "action":
+            row = self.action_row
+            if row is None:
+                self.notify("No row selected")
+                return
+            open_url(row.gmail_url)
+            return
+        row_index = self._cursor_row_index()
+        if row_index is None:
             self.notify("No row selected")
             return
+        row = self._drop_row_from_table(row_index)
+        self._update_ui()
         open_url(row.gmail_url)
+
+        async def finish() -> None:
+            await self._complete_mark_read(row, row_index)
+
+        self.run_worker(finish, exclusive=False, group="mark_read")
 
     def on_data_table_row_selected(self, event: DataTableWidget.RowSelected) -> None:
         if event.control.id != "inbox_table":
@@ -314,7 +560,7 @@ class InboxTuiApp(App[int]):
                     pick_inbox_row_flow,
                     self.vault_root,
                     row,
-                    open_obsidian=False,
+                    editor=EditorConfig.none(),
                     project=project,
                 )
             except AmbiguousProjectError as exc:
@@ -334,23 +580,37 @@ class InboxTuiApp(App[int]):
         if row is None or row_index is None:
             self.notify("No row selected")
             return
+        row = self._drop_row_from_table(row_index, celebrate_on_empty=False)
+        self._update_ui()
         self._set_busy("Opening reply…")
         try:
             path = await self._pick_at_row(row)
         finally:
             self._clear_busy()
         if path is None:
+            self._restore_row_at(row_index, row)
+            self._update_ui()
             return
-        self.open_row_index = row_index
+        self.action_row = row
+        self.open_row_index = None
         self.reply_path = path
         self.mode = "action"
         self._update_ui()
-        if self.open_obsidian:
 
-            async def launch_obsidian() -> None:
-                await asyncio.to_thread(open_in_obsidian, path)
+        async def mark_opened_read() -> None:
+            try:
+                await asyncio.to_thread(mark_read_inbox_row, row)
+            except (RuntimeError, ValueError, KeyError, FileNotFoundError) as exc:
+                self.notify(str(exc), severity="error", timeout=6)
 
-            self.run_worker(launch_obsidian, exclusive=False, group="obsidian")
+        self.run_worker(mark_opened_read, exclusive=False, group="mark_read")
+
+        if self.editor.opens:
+
+            async def launch_editor() -> None:
+                await asyncio.to_thread(open_reply_file, path, self.editor)
+
+            self.run_worker(launch_editor, exclusive=False, group="editor")
 
     def action_mark_read_row(self) -> None:
         if self.mode != "browse":
@@ -360,15 +620,9 @@ class InboxTuiApp(App[int]):
         if row_index is None:
             self.notify("No row selected")
             return
-        row = self.rows[row_index]
-        del self.rows[row_index]
-        try:
-            self._sync_session_from_rows()
-        except OSError as exc:
-            self.notify(f"Session save failed: {exc}", severity="warning")
-        self._apply_table_ui()
-        if not self.rows:
-            self.notify("Inbox empty")
+        row = self._drop_row_from_table(row_index)
+        self._update_ui()
+
         async def finish() -> None:
             await self._complete_mark_read(row, row_index)
 
@@ -379,25 +633,49 @@ class InboxTuiApp(App[int]):
         try:
             await asyncio.to_thread(mark_read_inbox_row, row)
         except (RuntimeError, ValueError, KeyError, FileNotFoundError) as exc:
-            self.rows.insert(min(row_index, len(self.rows)), row)
-            try:
-                self._sync_session_from_rows()
-            except OSError:
-                pass
-            self._apply_table_ui()
+            self._restore_row_at(row_index, row)
+            self._update_ui()
             self.notify(str(exc), severity="error", timeout=6)
 
     def action_refresh_inbox(self) -> None:
+        if self._busy_message or self.refresh_rows is None:
+            return
+        self.run_worker(self._do_refresh_inbox(), exclusive=True, group="inbox_refresh")
+
+    async def _do_refresh_inbox(self) -> None:
         if self.refresh_rows is None:
             return
-        self.rows = self.refresh_rows()
+        self._set_busy("Refreshing inbox…")
+        try:
+            rows = await asyncio.to_thread(self.refresh_rows)
+        except Exception as exc:
+            self.notify(str(exc), severity="error", timeout=6)
+            return
+        finally:
+            self._clear_busy()
+        self.rows = rows
         self._apply_table_ui()
-        if not self.rows:
-            self.notify("No unread threads")
+
+    async def _do_auto_refresh(self) -> None:
+        if self.refresh_rows is None:
+            return
+        if self.mode != "browse" or self._busy_message:
+            return
+        try:
+            rows = await asyncio.to_thread(self.refresh_rows)
+        except Exception:
+            return
+        rows = self._filter_recently_dismissed(rows)
+        self._apply_auto_refresh_rows(rows)
 
     def action_back_to_browse(self) -> None:
         self.mode = "browse"
+        self.reply_path = None
+        self.action_row = None
+        self.open_row_index = None
         self._update_ui()
+        if not self.rows:
+            self._schedule_inbox_zero_celebration()
 
     def action_quit_app(self) -> None:
         self.exit(0)
@@ -425,6 +703,8 @@ class InboxTuiApp(App[int]):
         finally:
             self._clear_busy()
         self._remove_open_row_after_send()
+        if not self.rows:
+            self._schedule_inbox_zero_celebration()
 
     def action_push_send(self) -> None:
         if self._busy_message:
@@ -449,6 +729,8 @@ class InboxTuiApp(App[int]):
         finally:
             self._clear_busy()
         self._remove_open_row_after_send()
+        if not self.rows:
+            self._schedule_inbox_zero_celebration()
 
     def _remove_open_row_after_send(self) -> None:
         """Drop thread from inbox after send/draft (Gmail marked read in push_*)."""
@@ -465,16 +747,15 @@ class InboxTuiApp(App[int]):
             except OSError as exc:
                 self.notify(f"Session save failed: {exc}", severity="warning")
         self._apply_table_ui()
-        if not self.rows:
-            self.notify("Inbox empty")
 
 
 def run_textual_inbox_session(
     vault_root: Path,
     rows: list[InboxRow],
     *,
-    open_obsidian: bool,
+    editor: EditorConfig,
     refresh_rows: Callable[[], list[InboxRow]] | None = None,
+    auto_refresh_seconds: int = DEFAULT_AUTO_REFRESH_SECONDS,
 ) -> int:
     """Run full Textual inbox session until user quits."""
     if not sys.stdin.isatty():
@@ -482,8 +763,9 @@ def run_textual_inbox_session(
     app = InboxTuiApp(
         vault_root,
         rows,
-        open_obsidian=open_obsidian,
+        editor=editor,
         refresh_rows=refresh_rows,
+        auto_refresh_seconds=auto_refresh_seconds,
     )
     return app.run() or 0
 

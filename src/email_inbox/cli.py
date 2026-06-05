@@ -12,7 +12,7 @@ from email_inbox.config import load_config
 from email_inbox.formatting import InboxRow, render_inbox
 from email_inbox.interactive import run_pick_loop, should_interact
 from email_inbox.list_inbox import ListResult, fetch_combined_inbox, list_result_to_json
-from email_inbox.obsidian import open_in_obsidian
+from email_inbox.editor import EditorConfig, open_reply_file, resolve_editor
 from email_inbox.paths import accounts_path, resolve_vault_root, session_path
 from email_inbox.pick import AmbiguousProjectError, format_success, pick_and_write
 from email_inbox.routing import format_project_menu, project_from_input
@@ -63,14 +63,9 @@ def _add_list_flags(parser: argparse.ArgumentParser) -> None:
         help="Do not prompt after list",
     )
     parser.add_argument(
-        "--tui",
-        action="store_true",
-        help="Textual scrollable table for row pick (experiment; post-pick prompts unchanged)",
-    )
-    parser.add_argument(
         "--no-tui",
         action="store_true",
-        help="Force typed row number even if --tui was set elsewhere",
+        help="Typed row-number prompts instead of the Textual inbox (fallback for broken terminals)",
     )
     _add_open_flags(parser)
 
@@ -79,35 +74,34 @@ def _add_open_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--open",
         action="store_true",
-        help="Open reply file in Obsidian after pick",
+        help="Open reply in Obsidian after pick (overrides editor config)",
     )
     parser.add_argument(
         "--no-open",
         action="store_true",
-        help="Do not open Obsidian after pick",
+        help="Do not open an editor after pick",
     )
 
 
-def _resolve_open_obsidian(args: argparse.Namespace) -> bool:
-    if getattr(args, "no_open", False):
-        return False
-    if getattr(args, "open", False):
-        return True
-    return load_config().open_obsidian
+def _resolve_editor(args: argparse.Namespace) -> EditorConfig:
+    return resolve_editor(
+        cli_no_open=getattr(args, "no_open", False),
+        cli_open=getattr(args, "open", False),
+    )
 
 
 def _build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument(
         "--vault-root",
-        help="Obsidian vault root (overrides config and EMAIL_INBOX_VAULT_ROOT)",
+        help="Obsidian vault root (overrides config and INBOX_VAULT_ROOT)",
     )
 
     list_options = argparse.ArgumentParser(add_help=False)
     _add_list_flags(list_options)
 
     parser = argparse.ArgumentParser(
-        prog="email-inbox",
+        prog="inbox",
         parents=[common, list_options],
         description="List unread Gmail inbox threads (gog) for vault-configured mailboxes.",
     )
@@ -174,9 +168,10 @@ def _inbox_query(newer_than: str | None) -> str:
 
 
 def _use_tui(args: argparse.Namespace) -> bool:
+    """Textual inbox on TTY by default; --no-tui uses typed row numbers."""
     if getattr(args, "no_tui", False):
         return False
-    return bool(getattr(args, "tui", False))
+    return sys.stdin.isatty() and sys.stdout.isatty()
 
 
 def _interactive_tty(args: argparse.Namespace) -> bool:
@@ -286,18 +281,18 @@ def _cmd_list(args: argparse.Namespace) -> int:
             output_format=args.format,
         )
 
-    if not result.rows:
-        return 2
     if result.search_errors and not result.rows:
         return 1
 
+    use_tui = _use_tui(args)
     if should_interact(
         interactive=args.interactive,
         no_interactive=args.no_interactive,
         is_json=args.json,
         row_count=len(result.rows),
+        use_tui=use_tui,
     ):
-        open_obs = _resolve_open_obsidian(args)
+        editor = _resolve_editor(args)
 
         def refresh_rows() -> list[InboxRow]:
             fresh = _fetch_and_save_session(
@@ -306,25 +301,26 @@ def _cmd_list(args: argparse.Namespace) -> int:
                 newer_than=args.newer_than,
                 max_per_mailbox=args.max,
             )
-            if not fresh.rows:
-                print("No unread threads.", file=sys.stderr)
             return fresh.rows
 
         return run_pick_loop(
             vault,
             result.rows,
-            open_obsidian=open_obs,
+            editor=editor,
             refresh_rows=refresh_rows,
             output_format=args.format,
-            use_tui=_use_tui(args),
+            use_tui=use_tui,
         )
+
+    if not result.rows:
+        return 2
 
     return 0
 
 
 def _cmd_pick(args: argparse.Namespace) -> int:
     vault = resolve_vault_root(args.vault_root)
-    open_obsidian = _resolve_open_obsidian(args)
+    editor = _resolve_editor(args)
     project: str | None = args.project
 
     while True:
@@ -354,8 +350,8 @@ def _cmd_pick(args: argparse.Namespace) -> int:
             break
 
     print(format_success(vault, path))
-    if open_obsidian and open_in_obsidian(path):
-        print("Opened in Obsidian", file=sys.stderr)
+    if open_reply_file(path, editor):
+        print(editor.success_message(), file=sys.stderr)
     return 0
 
 

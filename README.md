@@ -1,116 +1,99 @@
-# email-inbox
+# inbox-cli
 
-List unread Gmail inbox threads across multiple accounts using [gog](https://github.com/steipete/gog), draft replies in your Obsidian vault.
+Gmail unread inbox TUI via [gog](https://github.com/steipete/gog), with reply drafts in your Obsidian vault.
+
+**Not** the Obsidian `Inbox.md` processor (that is [`~/Projects/inbox`](https://github.com/pxg/Inbox), command `vault-inbox`).
+
+**PyPI:** [`inbox-cli`](https://pypi.org/project/inbox-cli/) (the name `inbox` on PyPI is the old Nylas SDK). **Command:** `inbox`.
 
 ## Requirements
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) (`brew install uv`)
 - `gog` on `PATH` with Gmail OAuth per mailbox in `accounts.md`
-- macOS + Obsidian (optional, for `--open` / default open after pick)
+- macOS (optional editor after pick; default is Obsidian)
 
 ## Setup
 
-Clone or open the repo, sync dependencies, then install the CLI globally (editable):
-
 ```bash
-cd ~/Projects/email-inbox
+cd ~/Projects/inbox-cli
 uv sync
 uv tool install -e .
 ```
 
-`-e` installs in editable mode: Python changes in `src/` are picked up on the next run without reinstalling.
-
-Ensure `~/.local/bin` is on your `PATH` (uv’s default tool directory). Then run from **any directory**:
+Editable install: code changes apply on the next run without reinstalling.
 
 ```bash
-email-inbox list
-email-inbox pick 2
+inbox list
+inbox pick 2
 ```
 
-Reinstall only when packaging changes, for example new dependencies or `[project.scripts]`:
-
-```bash
-uv tool install --force -e ~/Projects/email-inbox
-```
+`email-inbox` remains as a deprecated alias for the same entry point.
 
 ### Vault path
 
-Resolution order: `--vault-root` → `EMAIL_INBOX_VAULT_ROOT` → `~/.config/email-inbox/config.toml` → `~/Documents/Obsidian Vault`
+`--vault-root` → `INBOX_VAULT_ROOT` → `~/.config/inbox-cli/config.toml` → `~/Documents/Obsidian Vault`
 
-Vault paths are absolute; cwd does not matter.
+Legacy: `EMAIL_INBOX_VAULT_ROOT` and `~/.config/email-inbox/` still work.
 
 ```bash
-mkdir -p ~/.config/email-inbox
-cp config.toml.example ~/.config/email-inbox/config.toml
+mkdir -p ~/.config/inbox-cli
+cp config.toml.example ~/.config/inbox-cli/config.toml
 ```
+
+### Editor after pick
+
+Opens the reply file when you pick a row (TUI **enter** or `inbox pick N`).
+
+Precedence: `--no-open` / `--open` → `INBOX_EDITOR` → `config.toml` → Obsidian.
+
+| `editor` in config | Behaviour |
+|--------------------|-----------|
+| `"obsidian"` (default) | Obsidian URI / `open -a Obsidian` |
+| `"none"` | Do not open |
+| `"cursor"`, `"code"`, `"vscode"` | Built-in shortcuts |
+| `["your-cli", "{path}"]` | Any command; `{path}` is the reply file |
+
+`open_obsidian = false` in config still works (same as `editor = "none"`).
+
+### Auto-refresh (TUI)
+
+While browsing, the inbox re-fetches from Gmail every **60 seconds** (not during reply/send/mark-read). Disable with `auto_refresh_seconds = 0` in config or `INBOX_AUTO_REFRESH=0`.
 
 ### Without a global install
 
 ```bash
-uv run --directory ~/Projects/email-inbox email-inbox list
+uv run --directory ~/Projects/inbox-cli inbox list
 ```
 
-Or: `alias email-inbox='uv run --directory ~/Projects/email-inbox email-inbox'`
+## TUI (default on TTY)
 
-## Terminal workflow
+**Browse:** ↑↓, **enter** reply, **o** open (Gmail), **r** refresh, **x** mark read, **q** quit. Inbox auto-refreshes every **60s** in browse mode. **After open:** **d** draft, **s** send, **esc** back.
+
+**`--no-tui`:** typed row numbers and post-pick prompts (fallback).
+
+## Commands
 
 ```bash
-email-inbox          # same as email-inbox list
-email-inbox list
-```
-
-On a TTY, shows a **Rich grid**, then prompts for a **row number**. Writes `.inbox-session.json`.
-
-```
-Pick row [1-N] (q to quit):
-```
-
-**Experiment (branch `experiment/textual-picker`):** `email-inbox list --tui` keeps the table on screen. One hint bar under the table (no duplicate footer). **Browse:** ↑↓, **enter** open in Obsidian, **o** open thread in Gmail, **r** mark read, **f** refresh, **q** quit. **After open:** **d** draft, **s** send, **o** Gmail, **esc** back to browse.
-
-After pick, typed prompts: `d` draft, `s` send, `b` browse again, `r` refresh (re-fetch and re-print table), `q` quit. You can also type another row number from the post-pick menu.
-
-- **`--no-interactive`:** list only (prints table, no picker)
-- **`--no-open`:** do not launch Obsidian after pick
-- Cannot send twice from the same reply file (`status: sent` blocks it)
-
-Picking the same thread again opens the existing `email-reply` note (matched by `mailbox` + `thread_id` in frontmatter) instead of creating `Reply to … (2).md`.
-
-One-shot pick without re-listing:
-
-```bash
-email-inbox pick 2
-```
-
-Push a reply file without the interactive loop:
-
-```bash
-email-inbox send path/to/reply.md          # Gmail draft
-email-inbox send path/to/reply.md --send   # send immediately
-email-inbox send path/to/reply.md --send --force   # re-send if already sent
+inbox              # list + TUI
+inbox list
+inbox pick 2
+inbox send path/to/reply.md
+inbox send path/to/reply.md --send
 ```
 
 ## Output formats
 
 | Flag | Use |
 |------|-----|
-| default | Rich table in terminal |
-| `--format markdown` | Pipe table (scripts) |
+| default | Rich table (non-TUI) or Textual TUI |
+| `--format markdown` | Pipe table |
 | `--json` | Session JSON only |
-
-## Project routing
-
-Automatic: `routing.yaml`, learned `email-reply` files, subject keywords, else `emails/`.
-
-Copy vault `Projects/Cursor Gmail/routing.yaml.example` → `routing.yaml` for explicit sender maps.
 
 ## Development
 
-Work in `~/Projects/email-inbox`. With editable install, test changes via `email-inbox` from any cwd.
-
 ```bash
 uv run pytest
-uv run pytest --cov=email_inbox --cov-report=term-missing
 ```
 
-After changing `pyproject.toml` dependencies: `uv sync` then `uv tool install --force -e .`
+After dependency changes: `uv sync` then `uv tool install --force -e .`

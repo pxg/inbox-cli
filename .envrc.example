@@ -1,4 +1,8 @@
-# Optional: enable with direnv (brew install direnv; add hook to ~/.zshrc)
-# cp .envrc.example .envrc && direnv allow
+# Optional: vault root when not using config.toml
+export INBOX_VAULT_ROOT="$HOME/Documents/Obsidian Vault"
 
-export EMAIL_INBOX_VAULT_ROOT="$HOME/Documents/Obsidian Vault"
+# Optional: editor for this shell (overrides config.toml; not --no-open / --open)
+# export INBOX_EDITOR=none
+# export INBOX_EDITOR=cursor
+
+# export INBOX_AUTO_REFRESH=0
