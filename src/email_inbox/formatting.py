@@ -7,8 +7,11 @@ from urllib.parse import quote
 
 _GMAIL_BASE = "https://mail.google.com/mail/?authuser="
 
-FROM_TABLE_MAX = 22
-SUBJECT_TABLE_MAX = 56
+INDEX_TABLE_WIDTH = 3
+FROM_TABLE_MAX = 14
+SUBJECT_TABLE_MAX = 53
+ACCOUNT_TABLE_MAX = 18
+DATE_TABLE_WIDTH = 17
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,10 @@ class InboxRow:
     @property
     def subject_for_table(self) -> str:
         return truncate_table_cell(self.subject, SUBJECT_TABLE_MAX)
+
+    @property
+    def account_for_table(self) -> str:
+        return truncate_table_cell(self.label, ACCOUNT_TABLE_MAX)
 
     @property
     def gmail_url(self) -> str:
@@ -92,7 +99,7 @@ def render_markdown_table(rows: list[InboxRow]) -> str:
     ]
     for i, row in enumerate(rows, start=1):
         lines.append(
-            f"| {i} | {row.from_for_table} | {row.subject_markdown} | {row.label} | {row.date} |"
+            f"| {i} | {row.from_for_table} | {row.subject_markdown} | {row.account_for_table} | {row.date} |"
         )
     return "\n".join(lines)
 

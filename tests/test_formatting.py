@@ -1,4 +1,5 @@
 from email_inbox.formatting import (
+    ACCOUNT_TABLE_MAX,
     FROM_TABLE_MAX,
     SUBJECT_TABLE_MAX,
     InboxRow,
@@ -45,4 +46,5 @@ def test_inbox_row_table_cells_are_capped() -> None:
     )
     assert len(row.from_for_table) <= FROM_TABLE_MAX
     assert len(row.subject_for_table) <= SUBJECT_TABLE_MAX
+    assert len(row.account_for_table) <= ACCOUNT_TABLE_MAX
     assert row.subject_for_table.endswith("…")

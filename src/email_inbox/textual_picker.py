@@ -17,7 +17,14 @@ from textual.widgets import Label, ListItem, ListView, Static
 from rich.text import Text
 
 from email_inbox.browser import open_url
-from email_inbox.formatting import FROM_TABLE_MAX, SUBJECT_TABLE_MAX, InboxRow
+from email_inbox.formatting import (
+    ACCOUNT_TABLE_MAX,
+    DATE_TABLE_WIDTH,
+    FROM_TABLE_MAX,
+    INDEX_TABLE_WIDTH,
+    SUBJECT_TABLE_MAX,
+    InboxRow,
+)
 from email_inbox.mark_read import mark_read_inbox_row
 from email_inbox.paths import session_path
 from email_inbox.pick import AmbiguousProjectError
@@ -306,17 +313,17 @@ class InboxTuiApp(App[int]):
     def _fill_table(self) -> None:
         table = self.query_one("#inbox_table", InboxDataTable)
         table.clear(columns=True)
-        table.add_column("#", width=4)
+        table.add_column("#", width=INDEX_TABLE_WIDTH)
         table.add_column("From", width=FROM_TABLE_MAX)
         table.add_column("Subject", width=SUBJECT_TABLE_MAX)
-        table.add_column("Account", width=18)
-        table.add_column("Date", width=17)
+        table.add_column("Account", width=ACCOUNT_TABLE_MAX)
+        table.add_column("Date", width=DATE_TABLE_WIDTH)
         for index, row in enumerate(self.rows, start=1):
             table.add_row(
                 str(index),
                 row.from_for_table,
                 row.subject_for_table,
-                row.label,
+                row.account_for_table,
                 row.date,
             )
         if self.rows:

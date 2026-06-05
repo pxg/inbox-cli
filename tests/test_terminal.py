@@ -14,11 +14,11 @@ def _row() -> InboxRow:
 
 
 def test_rich_table_contains_columns() -> None:
-    text = render_rich_inbox_as_text([_row()], width=100)
+    text = render_rich_inbox_as_text([_row()], width=120)
     assert "Inbox (1 unread)" in text
     assert "From" in text
     assert "Subject" in text
-    assert "example.com" in text
+    assert "examp" in text
     assert "acme" in text
 
 

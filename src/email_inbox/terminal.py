@@ -10,7 +10,14 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from email_inbox.formatting import InboxRow
+from email_inbox.formatting import (
+    ACCOUNT_TABLE_MAX,
+    DATE_TABLE_WIDTH,
+    FROM_TABLE_MAX,
+    INDEX_TABLE_WIDTH,
+    SUBJECT_TABLE_MAX,
+    InboxRow,
+)
 
 from email_inbox.theme import HEADER, SUBJECT, SUBJECT_UNDERLINE, TEXT_BRIGHT
 
@@ -51,24 +58,36 @@ def build_inbox_table(rows: list[InboxRow]) -> Table:
         expand=True,
         pad_edge=True,
     )
-    table.add_column("#", style=_CELL_STYLE, width=4, justify="center")
-    table.add_column("From", style=_CELL_STYLE, min_width=14, overflow="fold", no_wrap=False)
+    table.add_column("#", style=_CELL_STYLE, width=INDEX_TABLE_WIDTH, justify="center")
+    table.add_column(
+        "From",
+        style=_CELL_STYLE,
+        width=FROM_TABLE_MAX,
+        overflow="ellipsis",
+        no_wrap=True,
+    )
     table.add_column(
         "Subject",
         style=_CELL_STYLE,
-        min_width=28,
-        ratio=1,
-        overflow="fold",
+        width=SUBJECT_TABLE_MAX,
+        overflow="ellipsis",
+        no_wrap=True,
     )
-    table.add_column("Account", style=_CELL_STYLE, min_width=18, no_wrap=True)
-    table.add_column("Date", style=_CELL_STYLE, width=17, no_wrap=True)
+    table.add_column(
+        "Account",
+        style=_CELL_STYLE,
+        width=ACCOUNT_TABLE_MAX,
+        overflow="ellipsis",
+        no_wrap=True,
+    )
+    table.add_column("Date", style=_CELL_STYLE, width=DATE_TABLE_WIDTH, no_wrap=True)
 
     for index, row in enumerate(rows):
         table.add_row(
             str(index + 1),
             row.from_for_table,
             _subject_text(row),
-            row.label,
+            row.account_for_table,
             row.date,
             style=_CELL_STYLE,
         )
