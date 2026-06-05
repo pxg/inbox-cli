@@ -66,7 +66,7 @@ def build_inbox_table(rows: list[InboxRow]) -> Table:
     for index, row in enumerate(rows):
         table.add_row(
             str(index + 1),
-            row.from_display,
+            row.from_for_table,
             _subject_text(row),
             row.label,
             row.date,

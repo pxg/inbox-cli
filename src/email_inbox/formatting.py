@@ -7,6 +7,9 @@ from urllib.parse import quote
 
 _GMAIL_BASE = "https://mail.google.com/mail/?authuser="
 
+FROM_TABLE_MAX = 22
+SUBJECT_TABLE_MAX = 56
+
 
 @dataclass(frozen=True)
 class InboxRow:
@@ -30,8 +33,12 @@ class InboxRow:
         return display_name(self.from_header)
 
     @property
+    def from_for_table(self) -> str:
+        return truncate_table_cell(self.from_display, FROM_TABLE_MAX)
+
+    @property
     def subject_for_table(self) -> str:
-        return sanitize_table_cell(self.subject)
+        return truncate_table_cell(self.subject, SUBJECT_TABLE_MAX)
 
     @property
     def gmail_url(self) -> str:
@@ -61,6 +68,18 @@ def sanitize_table_cell(text: str) -> str:
     return text.replace("|", "·").strip()
 
 
+def truncate_table_cell(text: str, max_len: int) -> str:
+    """Sanitize and cap cell text for fixed-width inbox tables."""
+    text = sanitize_table_cell(text)
+    if max_len <= 0:
+        return ""
+    if len(text) <= max_len:
+        return text
+    if max_len == 1:
+        return "…"
+    return text[: max_len - 1].rstrip() + "…"
+
+
 def render_markdown_table(rows: list[InboxRow]) -> str:
     if not rows:
         return "Inbox clear."
@@ -73,7 +92,7 @@ def render_markdown_table(rows: list[InboxRow]) -> str:
     ]
     for i, row in enumerate(rows, start=1):
         lines.append(
-            f"| {i} | {row.from_display} | {row.subject_markdown} | {row.label} | {row.date} |"
+            f"| {i} | {row.from_for_table} | {row.subject_markdown} | {row.label} | {row.date} |"
         )
     return "\n".join(lines)
 
