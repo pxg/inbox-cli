@@ -523,7 +523,6 @@ class InboxTuiApp(App[int]):
 
     def _redraw_table(self) -> None:
         self._fill_table()
-        self.query_one("#inbox_table", InboxDataTable).refresh()
 
     def action_open_gmail(self) -> None:
         if self._busy_message:
@@ -572,7 +571,7 @@ class InboxTuiApp(App[int]):
                     return None
 
     def action_open_row(self) -> None:
-        self.run_worker(self._do_open_row(), exclusive=True)
+        self.run_worker(self._do_open_row(), exclusive=False, group="open_reply")
 
     async def _do_open_row(self) -> None:
         row_index = self._cursor_row_index()
@@ -582,11 +581,7 @@ class InboxTuiApp(App[int]):
             return
         row = self._drop_row_from_table(row_index, celebrate_on_empty=False)
         self._update_ui()
-        self._set_busy("Opening reply…")
-        try:
-            path = await self._pick_at_row(row)
-        finally:
-            self._clear_busy()
+        path = await self._pick_at_row(row)
         if path is None:
             self._restore_row_at(row_index, row)
             self._update_ui()

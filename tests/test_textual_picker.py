@@ -21,6 +21,27 @@ def _row(subject: str = "Hello") -> InboxRow:
     )
 
 
+def test_enter_does_not_show_opening_reply_busy(tmp_path: Path) -> None:
+    reply = tmp_path / "reply.md"
+    reply.write_text("x")
+
+    def slow_pick(*_args, **_kwargs) -> Path:
+        time.sleep(0.2)
+        return reply
+
+    async def run() -> None:
+        app = InboxTuiApp(tmp_path, [_row()], editor=EditorConfig.none())
+        with patch("email_inbox.textual_picker.pick_inbox_row_flow", side_effect=slow_pick):
+            async with app.run_test() as pilot:
+                await pilot.press("enter")
+                await pilot.pause(delay=0.05)
+                hint = app.query_one("#hint_bar", Static)
+                assert "OPENING" not in str(hint.content).upper()
+                await pilot.pause(delay=0.3)
+
+    asyncio.run(run())
+
+
 def test_enter_removes_row_before_slow_pick(tmp_path: Path) -> None:
     reply = tmp_path / "reply.md"
     reply.write_text("x")
