@@ -160,6 +160,48 @@ def test_mark_read_removes_row_immediately_before_gog() -> None:
     asyncio.run(run())
 
 
+def test_mark_read_keeps_cursor_on_next_row() -> None:
+    async def run() -> None:
+        app = InboxTuiApp(
+            Path("/tmp"),
+            [_row("One"), _row("Two"), _row("Three")],
+            editor=EditorConfig.none(),
+        )
+        with patch("email_inbox.textual_picker.mark_read_inbox_row"):
+            async with app.run_test() as pilot:
+                await pilot.press("down")
+                await pilot.press("x")
+                await pilot.pause(delay=0.05)
+                table = app.query_one("#inbox_table")
+        assert len(app.rows) == 2
+        assert app.rows[0].subject == "One"
+        assert app.rows[1].subject == "Three"
+        assert table.cursor_row == 1
+
+    asyncio.run(run())
+
+
+def test_mark_read_last_row_moves_to_row_above() -> None:
+    async def run() -> None:
+        app = InboxTuiApp(
+            Path("/tmp"),
+            [_row("One"), _row("Two"), _row("Three")],
+            editor=EditorConfig.none(),
+        )
+        with patch("email_inbox.textual_picker.mark_read_inbox_row"):
+            async with app.run_test() as pilot:
+                await pilot.press("down")
+                await pilot.press("down")
+                await pilot.press("x")
+                await pilot.pause(delay=0.05)
+                table = app.query_one("#inbox_table")
+        assert len(app.rows) == 2
+        assert app.rows[1].subject == "Two"
+        assert table.cursor_row == 1
+
+    asyncio.run(run())
+
+
 def test_mark_read_restores_row_when_gog_fails() -> None:
     async def run() -> None:
         app = InboxTuiApp(Path("/tmp"), [_row(), _row("Two")], editor=EditorConfig.none())

@@ -310,7 +310,7 @@ class InboxTuiApp(App[int]):
                 name="inbox_auto_refresh",
             )
 
-    def _fill_table(self) -> None:
+    def _fill_table(self, *, cursor_row: int | None = None) -> None:
         table = self.query_one("#inbox_table", InboxDataTable)
         table.clear(columns=True)
         table.add_column("#", width=INDEX_TABLE_WIDTH)
@@ -327,7 +327,10 @@ class InboxTuiApp(App[int]):
                 row.date,
             )
         if self.rows:
-            table.move_cursor(row=min(table.cursor_row or 0, len(self.rows) - 1))
+            if cursor_row is not None:
+                table.move_cursor(row=min(cursor_row, len(self.rows) - 1))
+            else:
+                table.move_cursor(row=min(table.cursor_row or 0, len(self.rows) - 1))
 
     def _sync_session_from_rows(self) -> None:
         path = session_path(self.vault_root)
@@ -504,7 +507,8 @@ class InboxTuiApp(App[int]):
         except OSError as exc:
             self.notify(f"Session save failed: {exc}", severity="warning")
         self.title = title_bar(len(self.rows))
-        self._redraw_table()
+        cursor_after = min(row_index, len(self.rows) - 1) if self.rows else None
+        self._redraw_table(cursor_row=cursor_after)
         self._note_dismissed(row)
         self._pause_auto_refresh()
         if not self.rows and celebrate_on_empty:
@@ -530,10 +534,10 @@ class InboxTuiApp(App[int]):
         except OSError:
             pass
         self.title = title_bar(len(self.rows))
-        self._redraw_table()
+        self._redraw_table(cursor_row=min(row_index, len(self.rows) - 1) if self.rows else None)
 
-    def _redraw_table(self) -> None:
-        self._fill_table()
+    def _redraw_table(self, *, cursor_row: int | None = None) -> None:
+        self._fill_table(cursor_row=cursor_row)
 
     def action_open_gmail(self) -> None:
         if self._busy_message:
