@@ -10,6 +10,8 @@ import yaml
 
 _YAML_FENCE = re.compile(r"```yaml\s*\n(.*?)```", re.DOTALL)
 
+DEFAULT_MAX_UNREAD_PER_MAILBOX = 50
+
 
 @dataclass(frozen=True)
 class Mailbox:
@@ -53,7 +55,9 @@ def parse_accounts_md(text: str) -> AccountsConfig:
     return AccountsConfig(
         mailboxes=mailboxes,
         default_mailbox=str(raw.get("default_mailbox") or mailboxes[0].address),
-        max_unread_per_mailbox=int(raw.get("max_unread_per_mailbox") or 10),
+        max_unread_per_mailbox=int(
+            raw.get("max_unread_per_mailbox") or DEFAULT_MAX_UNREAD_PER_MAILBOX
+        ),
     )
 
 

@@ -16,7 +16,7 @@ def test_parse_accounts_fixture() -> None:
             Mailbox("alice@example.com", "example.com"),
         ],
         default_mailbox="alice@gmail.com",
-        max_unread_per_mailbox=10,
+        max_unread_per_mailbox=50,
     )
 
 
@@ -29,6 +29,16 @@ default_mailbox: one@example.com
     config = parse_accounts_md(text)
     assert config.mailboxes[0].address == "one@example.com"
     assert config.mailboxes[0].label == "example.com"
+
+
+def test_default_max_unread_when_omitted() -> None:
+    text = """```yaml
+mailboxes:
+  - one@example.com
+default_mailbox: one@example.com
+```"""
+    config = parse_accounts_md(text)
+    assert config.max_unread_per_mailbox == 50
 
 
 def test_missing_yaml_fence() -> None:
