@@ -201,7 +201,7 @@ def test_latest_message_uses_cache_without_thread_get() -> None:
 def test_pick_new_reply_fetches_full_body(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     (vault / "Projects" / "Acme" / "emails").mkdir(parents=True)
-    (vault / "Projects" / "Cursor Gmail").mkdir(parents=True)
+    (vault / "Projects" / "Inbox-CLI").mkdir(parents=True)
 
     row = InboxRow(
         mailbox="alice@example.com",

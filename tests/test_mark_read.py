@@ -8,7 +8,7 @@ from email_inbox.mark_read import mark_read_inbox_row, mark_read_row
 
 
 def test_mark_read_row(tmp_path: Path) -> None:
-    session_dir = tmp_path / "Projects" / "Cursor Gmail"
+    session_dir = tmp_path / "Projects" / "Inbox-CLI"
     session_dir.mkdir(parents=True)
     (session_dir / ".inbox-session.json").write_text(
         """{

@@ -104,7 +104,7 @@ def list_project_options(vault_root: Path) -> list[tuple[str, str]]:
 
 
 def _routing_yaml_matches(vault_root: Path, from_header: str) -> set[str]:
-    path = vault_root / "Projects" / "Cursor Gmail" / "routing.yaml"
+    path = vault_root / "Projects" / "Inbox-CLI" / "routing.yaml"
     if not path.is_file():
         return set()
     data = yaml.safe_load(path.read_text(encoding="utf-8"))

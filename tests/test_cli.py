@@ -11,7 +11,7 @@ from email_inbox.list_inbox import ListResult
 def test_default_command_is_list(tmp_path: Path) -> None:
     fixture = Path(__file__).parent / "fixtures" / "accounts.md"
     vault = tmp_path / "vault"
-    gmail_dir = vault / "Projects" / "Cursor Gmail"
+    gmail_dir = vault / "Projects" / "Inbox-CLI"
     gmail_dir.mkdir(parents=True)
     (gmail_dir / "accounts.md").write_text(fixture.read_text())
 
@@ -23,7 +23,7 @@ def test_default_command_is_list(tmp_path: Path) -> None:
 def test_list_empty_inbox_starts_tui_on_tty(tmp_path: Path) -> None:
     fixture = Path(__file__).parent / "fixtures" / "accounts.md"
     vault = tmp_path / "vault"
-    gmail_dir = vault / "Projects" / "Cursor Gmail"
+    gmail_dir = vault / "Projects" / "Inbox-CLI"
     gmail_dir.mkdir(parents=True)
     (gmail_dir / "accounts.md").write_text(fixture.read_text())
 
@@ -42,7 +42,7 @@ def test_list_empty_inbox_starts_tui_on_tty(tmp_path: Path) -> None:
 def test_list_empty_inbox(tmp_path: Path) -> None:
     fixture = Path(__file__).parent / "fixtures" / "accounts.md"
     vault = tmp_path / "vault"
-    gmail_dir = vault / "Projects" / "Cursor Gmail"
+    gmail_dir = vault / "Projects" / "Inbox-CLI"
     gmail_dir.mkdir(parents=True)
     (gmail_dir / "accounts.md").write_text(fixture.read_text())
 

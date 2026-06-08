@@ -8,7 +8,7 @@ from email_inbox.pick import pick_and_write, pick_inbox_row
 
 def test_pick_writes_file(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
-    gmail = vault / "Projects" / "Cursor Gmail"
+    gmail = vault / "Projects" / "Inbox-CLI"
     gmail.mkdir(parents=True)
     (vault / "Projects" / "Acme" / "emails").mkdir(parents=True)
 
@@ -61,7 +61,7 @@ def test_pick_reuses_existing_reply(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     acme_emails = vault / "Projects" / "Acme" / "emails"
     acme_emails.mkdir(parents=True)
-    (vault / "Projects" / "Cursor Gmail").mkdir(parents=True)
+    (vault / "Projects" / "Inbox-CLI").mkdir(parents=True)
 
     existing = acme_emails / "reply-note-03-06-2026.md"
     existing.write_text(
@@ -90,7 +90,7 @@ def test_pick_reuses_existing_reply(tmp_path: Path) -> None:
             }
         ]
     }
-    (vault / "Projects" / "Cursor Gmail" / ".inbox-session.json").write_text(
+    (vault / "Projects" / "Inbox-CLI" / ".inbox-session.json").write_text(
         json.dumps(session)
     )
 
@@ -124,7 +124,7 @@ def test_pick_reuses_reply_in_other_project_folder(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     acme_emails = vault / "Projects" / "Acme" / "emails"
     acme_emails.mkdir(parents=True)
-    (vault / "Projects" / "Cursor Gmail").mkdir(parents=True)
+    (vault / "Projects" / "Inbox-CLI").mkdir(parents=True)
 
     existing = acme_emails / "Steve — Demo (tid1abcd).md"
     existing.write_text(

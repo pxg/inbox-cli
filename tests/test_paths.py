@@ -24,5 +24,5 @@ def test_resolve_cli_over_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
 def test_accounts_and_session_paths(tmp_path: Path) -> None:
     root = tmp_path
     assert accounts_path(root).name == "accounts.md"
-    assert "Cursor Gmail" in str(accounts_path(root))
+    assert "Inbox-CLI" in str(accounts_path(root))
     assert session_path(root).name == ".inbox-session.json"

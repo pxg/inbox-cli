@@ -37,7 +37,7 @@ def test_explicit_zero(tmp_path: Path) -> None:
 
 
 def test_routing_yaml_sender(tmp_path: Path) -> None:
-    gmail = tmp_path / "Projects" / "Cursor Gmail"
+    gmail = tmp_path / "Projects" / "Inbox-CLI"
     gmail.mkdir(parents=True)
     (gmail / "routing.yaml").write_text("senders:\n  bob@client.example.com: Acme\n")
     project, _ = resolve_project(

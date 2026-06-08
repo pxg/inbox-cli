@@ -10,9 +10,9 @@ from email_inbox.config import load_config_vault_root
 ENV_VAULT_ROOT = "INBOX_VAULT_ROOT"
 ENV_VAULT_ROOT_LEGACY = "EMAIL_INBOX_VAULT_ROOT"
 DEFAULT_VAULT_ROOT = Path.home() / "Documents" / "Obsidian Vault"
-CURSOR_GMAIL_DIR = Path("Projects") / "Cursor Gmail"
-ACCOUNTS_FILE = CURSOR_GMAIL_DIR / "accounts.md"
-SESSION_FILE = CURSOR_GMAIL_DIR / ".inbox-session.json"
+INBOX_CLI_DIR = Path("Projects") / "Inbox-CLI"
+ACCOUNTS_FILE = INBOX_CLI_DIR / "accounts.md"
+SESSION_FILE = INBOX_CLI_DIR / ".inbox-session.json"
 
 
 def resolve_vault_root(explicit: str | None = None) -> Path:
